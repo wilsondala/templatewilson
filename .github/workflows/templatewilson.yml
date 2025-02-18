@@ -1,0 +1,76 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Instalar dependências
+        run: npm install
+
+      - name: Executar testes
+        run: npm test
+
+      - name: Construir aplicação
+        run: npm run build
+
+      - name: Armazenar artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifact
+          path: dist/
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar artefato
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifact
+          path: dist/
+
+      - name: Criar release no GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/**
+          tag_name: v1.0.${{ github.run_number }}
+          release_name: "Release ${{ github.run_number }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy:
+    needs: release
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Deploy aplicação
+        run: echo "Simulação de deploy"
+
+  notify:
+    if: failure()
+    needs: [build, release, deploy]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Enviar notificação por e-mail
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.EMAIL_USER }}
+          password: ${{ secrets.EMAIL_PASS }}
+          subject: "Falha no CI/CD"
+          body: "O pipeline falhou. Verifique os logs."
+          to: dalawilson1244@email.com
+          from: CI/CD Pipeline
